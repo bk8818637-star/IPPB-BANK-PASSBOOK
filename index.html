@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>IPPB Passbook PDF Downloader</title>
+<style>
+  body { font-family: 'Times New Roman', serif; margin: 0; padding: 20px; }
+  .header { text-align: center; margin-bottom: 20px; }
+  .instructions { margin-bottom: 20px; font-size: 12px; border: 1px solid #000; padding: 10px; border-radius: 5px; }
+  .divider { border-top: 1px solid #000; margin: 20px 0; }
+  .flex { display: flex; justify-content: space-between; font-size: 12px; gap: 20px; }
+  .flex > div { width: 48%; }
+  .button { display: block; width: 100%; padding: 10px; background-color: #4CAF50; color: white; border: none; cursor: pointer; text-align: center; margin-top: 20px; }
+  label { display: block; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1 style="font-size:18px;">INDIA POST PAYMENTS BANK PASSBOOK</h1>
+  <img src="background.png" alt="IPPB Logo" style="width:150px;margin:10px 0;">
+</div>
+
+<div class="branch-info" style="text-align:center;">
+  <p>Branch Office: India Post Payments Bank, Gandhichowk, Khammam 507003</p>
+</div>
+
+<div class="instructions">
+  <p>• Preserve Your Passbook Carefully. Do Not Put Your Signature on Passbook. Get Passbook Updated Regularly. Any Discrepancy Should Be Notified Immediately.</p>
+  <p>• Do Not Fold The Passbook. If a Passbook Is Lost Or Spoiled a Duplicate Passbook Will Be Given With Latest Balance After Payment Of Stipulated Charges.</p>
+  <p>• Please Do Not Give Your Personal Information, User Id, Pin, Password to Anyone. Any Calls or Emails Requesting For Such Information Should Be Notified to the Branch Immediately.</p>
+  <p>• Interest is Calculated On Daily Basis And Credited to Accounts With End of The Months.</p>
+</div>
+
+<div class="divider"></div>
+
+<div class="flex">
+  <div>
+    <label for="accountNo">Account No (12 digits):</label>
+    <input type="text" id="accountNo" maxlength="12" required>
+
+    <label for="customerId">Customer ID (10 digits):</label>
+    <input type="text" id="customerId" maxlength="10" required>
+
+    <label for="ifsc">IFSC:</label>
+    <input type="text" id="ifsc" value="IPOS0000001" readonly>
+
+    <label>Nomination:</label>
+    <input type="radio" name="nomination" value="Yes" checked> Yes
+    <input type="radio" name="nomination" value="No"> No
+
+    <label for="openingDate">A/C Opening Date:</label>
+    <input type="date" id="openingDate" required>
+  </div>
+
+  <div>
+    <label for="name">Name:</label>
+    <input type="text" id="name" required>
+
+    <label for="co">C/O:</label>
+    <input type="text" id="co">
+
+    <label for="mobile">Mobile (10 digits):</label>
+    <input type="text" id="mobile" maxlength="10" required>
+
+    <label for="aadhar">Aadhar No (12 digits):</label>
+    <input type="text" id="aadhar" maxlength="12" required>
+
+    <label for="address">Address:</label>
+    <textarea id="address" required></textarea>
+  </div>
+</div>
+
+<div class="photo-upload">
+  <label for="photo">Upload Photo:</label>
+  <input type="file" id="photo" accept="image/*">
+</div>
+
+<button class="button" onclick="downloadPDF()">Download PDF</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+// --- Live numeric filtering ---
+["accountNo", "customerId", "mobile", "aadhar"].forEach(id => {
+  document.getElementById(id).addEventListener("input", function() {
+    this.value = this.value.replace(/\D/g, ""); // digits only
+  });
+});
+
+// --- Validation ---
+function validateInputs() {
+  const v = id => document.getElementById(id).value.trim();
+  const accountNo = v('accountNo');
+  const customerId = v('customerId');
+  const mobile = v('mobile');
+  const aadhar = v('aadhar');
+  const name = v('name');
+  const openingDate = v('openingDate');
+  const address = v('address');
+
+  if (accountNo.length !== 12) { alert("Please enter a valid 12-digit Account Number."); return false; }
+  if (customerId.length !== 10) { alert("Please enter a valid 10-digit Customer ID."); return false; }
+  if (mobile.length !== 10) { alert("Please enter a valid 10-digit Mobile Number."); return false; }
+  if (aadhar.length !== 12) { alert("Please enter a valid 12-digit Aadhar Number."); return false; }
+  if (!name || !openingDate || !address) { alert("Please fill all required fields."); return false; }
+
+  return true;
+}
+
+// --- Helpers ---
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFromDataUrl(dataUrl) {
+  // returns 'PNG' or 'JPEG' for jsPDF
+  return dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+}
+
+async function downloadPDF() {
+  if (!validateInputs()) return;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ format: 'a4', unit: 'mm' });
+
+  // Gather values
+  const get = id => document.getElementById(id).value.trim();
+  const accountNo = get('accountNo');
+  const customerId = get('customerId');
+  const ifsc = get('ifsc');
+  const nomination = document.querySelector("input[name='nomination']:checked").value;
+  const openingDate = get('openingDate');
+  const name = get('name');
+  const co = get('co');
+  const mobile = get('mobile');
+  const aadhar = get('aadhar');
+  const address = get('address');
+
+  // Layout constants
+  const margin = 10;
+  const pageWidth = 210;
+  let y = margin;
+
+  // --- Title ---
+  doc.setFont('Times', 'bold');
+  doc.setFontSize(18);
+  doc.text('INDIA POST PAYMENTS BANK PASSBOOK', pageWidth / 2, y, { align: 'center' });
+  y += 5;
+
+  // --- Logo (between title and branch) ---
+  try {
+    const logo = await loadImage('background.png');
+    const logoW = 60, logoH = 20;
+    doc.addImage(logo, 'PNG', (pageWidth - logoW) / 2, y, logoW, logoH);
+    y += logoH + 8;
+  } catch {
+    y += 8;
+  }
+
+  // --- Branch line ---
+  doc.setFont('Times', 'normal');
+  doc.setFontSize(14);
+  doc.text('Branch Office: India Post Payments Bank, Gandhichowk, Khammam 507003', pageWidth / 2, y, { align: 'center' });
+  y += 10;
+
+  // --- Instructions + Photo Box (dynamic) ---
+  const instructions = [
+    "• Preserve Your Passbook Carefully. Do Not Put Your Signature on Passbook. Get Passbook Updated Regularly. Any Discrepancy Should Be Notified Immediately.",
+    "• Do Not Fold The Passbook. If a Passbook Is Lost Or Spoiled a Duplicate Passbook Will Be Given With Latest Balance After Payment Of Stipulated Charges.",
+    "• Please Do Not Give Your Personal Information, User Id, Pin, Password to Anyone. Any Calls or Emails Requesting For Such Information Should Be Notified to the Branch Immediately.",
+    "• Interest is Calculated On Daily Basis And Credited to Accounts With End of The Months."
+  ];
+
+  const boxX = margin, boxY = y + 2, boxW = pageWidth - margin * 2;
+  const pad = 4;
+  const photoW = 35, photoH = 45;
+
+  // Load uploaded photo (if any)
+  let photoDataUrl = null, photoFmt = 'JPEG';
+  const photoInput = document.getElementById('photo');
+  if (photoInput.files && photoInput.files[0]) {
+    try {
+      photoDataUrl = await readFileAsDataUrl(photoInput.files[0]);
+      photoFmt = formatFromDataUrl(photoDataUrl);
+    } catch { /* ignore photo errors */ }
+  }
+
+  // Compute text width (shift left if photo present)
+  const textMaxW = photoDataUrl ? (boxW - pad * 3 - photoW) : (boxW - pad * 2);
+  doc.setFontSize(11);
+
+  // Measure text height
+  let textLines = [];
+  let textHeight = 0;
+  const lineGap = 5.5;
+  instructions.forEach(t => {
+    const wrapped = doc.splitTextToSize(t, textMaxW);
+    textLines.push(wrapped);
+    textHeight += wrapped.length * lineGap + 1.5;
+  });
+
+  const contentH = Math.max(textHeight, photoDataUrl ? (photoH) : 0);
+  const boxH = contentH + pad * 2;
+
+  // Draw box
+  doc.setDrawColor(0);
+  doc.setLineWidth(0.3);
+  doc.rect(boxX, boxY, boxW, boxH);
+
+  // Draw text
+  let tY = boxY + pad + 4;
+  textLines.forEach(wrapped => {
+    doc.text(wrapped, boxX + pad, tY);
+    tY += wrapped.length * lineGap + 1.5;
+  });
+
+  // Draw photo (right side) if present
+  if (photoDataUrl) {
+    const imgX = boxX + boxW - pad - photoW;
+    const imgY = boxY + pad + 1;
+    doc.addImage(photoDataUrl, photoFmt, imgX, imgY, photoW, photoH);
+  }
+
+  y = boxY + boxH + 8;
+
+  // --- Divider ---
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 6;
+
+  // --- Customer Details (two columns) ---
+  doc.setFont('Times', 'bold');
+  doc.setFontSize(12);
+  doc.text('Customer Details:', margin, y);
+  y += 6;
+
+  doc.setFont('Times', 'normal');
+  const leftX = margin;
+  const rightX = pageWidth / 2 + 5;
+  let yLeft = y;
+  let yRight = y;
+
+  const lh = 7; // line height
+
+  // Left column (fixed-height items)
+  const leftItems = [
+    `Account No: ${accountNo}`,
+    `Customer ID: ${customerId}`,
+    `IFSC: ${ifsc}`,
+    `Nomination: ${nomination}`,
+    `A/C Opening Date: ${openingDate}`
+  ];
+  leftItems.forEach(txt => { doc.text(txt, leftX, yLeft); yLeft += lh; });
+
+  // Right column (Address wrapped)
+  const rightItems = [
+    `Name: ${name}`,
+    `C/O: ${co || '-'}`,
+    `Mobile: ${mobile}`,
+    `Aadhar: ${aadhar}`
+  ];
+  rightItems.forEach(txt => { doc.text(txt, rightX, yRight); yRight += lh; });
+
+  // Address (wrapped in right column)
+  const addrLabel = 'Address: ';
+  const maxRightWidth = (pageWidth - margin) - rightX; // available width on right
+  const addrLines = doc.splitTextToSize(address, maxRightWidth - (addrLabel.length * 2)); // rough pad
+  // Draw "Address:" label then lines underneath aligned with rightX
+  doc.text(addrLabel, rightX, yRight);
+  yRight += lh - 1;
+  doc.text(addrLines, rightX, yRight, { maxWidth: maxRightWidth });
+  yRight += addrLines.length * lh;
+
+  // Advance y to the lower of the two columns
+  y = Math.max(yLeft, yRight) + 8;
+
+  // --- Save with customer's name ---
+  const safeName = name.replace(/[^a-zA-Z0-9 ]/g, '');
+  const fileName = safeName ? `${safeName}'s IPPB e-passbook.pdf` : 'IPPB_Passbook.pdf';
+  doc.save(fileName);
+}
+</script>
+
+</body>
+</html>
