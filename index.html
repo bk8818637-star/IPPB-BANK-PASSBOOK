@@ -20,7 +20,7 @@
 <div class="header">
   <h1 style="font-size:18px;">INDIA POST PAYMENTS BANK PASSBOOK</h1>
   <img src="background.png" alt="IPPB Logo" style="width:150px;margin:10px 0;">
-</div>
+</div> 
 
 <div class="branch-info" style="text-align:center;">
   <p>Branch Office: India Post Payments Bank, Gandhichowk, Khammam 507003</p>
@@ -280,22 +280,4 @@ async function downloadPDF() {
   // Address (wrapped in right column)
   const addrLabel = 'Address: ';
   const maxRightWidth = (pageWidth - margin) - rightX; // available width on right
-  const addrLines = doc.splitTextToSize(address, maxRightWidth - (addrLabel.length * 2)); // rough pad
-  // Draw "Address:" label then lines underneath aligned with rightX
-  doc.text(addrLabel, rightX, yRight);
-  yRight += lh - 1;
-  doc.text(addrLines, rightX, yRight, { maxWidth: maxRightWidth });
-  yRight += addrLines.length * lh;
-
-  // Advance y to the lower of the two columns
-  y = Math.max(yLeft, yRight) + 8;
-
-  // --- Save with customer's name ---
-  const safeName = name.replace(/[^a-zA-Z0-9 ]/g, '');
-  const fileName = safeName ? `${safeName}'s IPPB e-passbook.pdf` : 'IPPB_Passbook.pdf';
-  doc.save(fileName);
-}
-</script>
-
-</body>
-</html>
+  const addrLines = doc.splitTextToSize(address, maxRightWidth - (addrLabel.leng
